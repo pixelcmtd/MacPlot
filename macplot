@@ -1,9 +1,9 @@
 #!/bin/sh
 case "$1" in
-        c*) sudo sh capture.sh ;;
+        c*) sudo python3 capture.py ;;
         p*) python3 plot.py *.json ;;
         *) echo "MacPlot by chrissx <chrissx@chrissx.de>
 Usage:
-./macplot capture: capture data
-./macplot plot: plot a graph" ;;
+./macplot c[apture]: capture data
+./macplot p[lot]: plot a graph" ;;
 esac
