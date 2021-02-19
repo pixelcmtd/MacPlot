@@ -21,7 +21,7 @@ def sample():
     timestamp = datetime.now() - starttime
     powermetrics = [strip_empty(re.split('[: ]+', s)) for s in strip_empty(l)]
     a = strip_empty(a.decode('utf-8').split('\n'))
-    a = [s for s in a if !s.contains('com.apple.')]
+    a = [s for s in a if s.find('com.apple.') == -1]
     spindump = [strip_empty(re.split('[: ]+', s)) for s in a]
     return {'timestamp':    timestamp / timedelta(milliseconds=1),
             'powermetrics': powermetrics,
