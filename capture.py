@@ -3,9 +3,10 @@ import json
 import subprocess
 import re
 from traceback import print_exc
-from datetime import datetime
+from datetime import datetime, timedelta
 
-filename = datetime + '.json'
+starttime = datetime.now()
+filename = starttime.ctime() + '.json'
 samples = []
 
 def system(cmd):
@@ -16,9 +17,13 @@ def strip_empty(l):
 
 def sample():
     l = system('powermetrics -i 1000 -n 1 | grep :').decode('utf-8').split('\n')
-    powermetrics = [strip_empty(re.split('[: ]', s)) for s in strip_empty(l)]
     a = system('spindump 1 1 1000 -onlyTarget -stdout -noFile -noBinary')
-    return {'timestamp':    datetime,
+    timestamp = datetime.now() - starttime
+    powermetrics = [strip_empty(re.split('[: ]+', s)) for s in strip_empty(l)]
+    a = strip_empty(a.decode('utf-8').split('\n'))
+    a = [s for s in a if !s.contains('com.apple.')]
+    spindump = [strip_empty(re.split('[: ]+', s)) for s in a]
+    return {'timestamp':    timestamp / timedelta(milliseconds=1),
             'powermetrics': powermetrics,
             'spindump':     spindump}
 
