@@ -1,22 +1,19 @@
+#!/usr/bin/env python3
 import json
-import matplotlib.pyplot as plt
 from sys import argv
+import csv
+import subprocess
 
-samples = json.load(open(argv[1], 'r'))
-time = []
-power = []
-# TODO: store in json
-current_time = 0
+samples = json.load(open(argv[1] + '.json', 'r'))
+w = csv.writer(open(argv[1] + '.csv', 'w'))
+
+w.writerow(['time (s)', 'power (mW)', 'fan (rpm)'])
 
 for sample in samples:
-    time.append(current_time)
-    power.append(int([i for i in sample if i[0] == 'Package' and i[1] == 'Power'][0][2]))
-    current_time += 1
+    row = [float(sample['timestamp']) / 1000]
+    row.append(int([i for i in sample['powermetrics'] if i[0] == 'Package' and i[1] == 'Power'][0][2]))
+    row.append(int([i for i in sample['spindump'] if i[0] == 'Fan' and i[1] == 'speed'][0][2]))
+    w.writerow(row)
 
-fig, ax = plt.subplots()
-ax.plot(time, power)
-ax.set(xlabel='time (s)', ylabel='power (mW)', title='MacPlot')
-ax.grid()
 
-fig.savefig("fig.png")
-plt.show()
+subprocess.run(['/bin/sh', '-c', 'open \'' + argv[1] + '.csv\''])
