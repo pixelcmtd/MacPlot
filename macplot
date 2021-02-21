@@ -33,7 +33,7 @@ def capture(capturename):
     f = open(filename, 'w')
     json.dump(samples, f)
     system('chown "$(logname)" "' + filename + '"')
-    print('Saved capture. Run ./macplot p ' + capturename + ' to plot.')
+    print('Saved capture. Run %s p %s to plot.' % argv[0], capturename)
 
 def plot(cap):
     samples = json.load(open(cap + '.json', 'r'))

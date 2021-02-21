@@ -26,3 +26,5 @@ Make sure you have the Numbers app installed.
 
 Then run `./macplot p [cap]` where `[cap]` is the name of the capture, for
 example `2021-02-21_13-06-49`.
+
+If you want to install it, you can also run `sm install`.
