@@ -1,6 +1,6 @@
 #!/bin/sh
 case "$1" in
-        c*) sudo python3 capture.py ;;
+        c*) python3 capture.py ;;
         p*) python3 plot.py "$2" ;;
         *) echo "MacPlot by chrissx <chrissx@chrissx.de>
 Usage:
