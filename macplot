@@ -33,21 +33,21 @@ def capture(capturename):
     f = open(filename, 'w')
     json.dump(samples, f)
     system('chown "$(logname)" "' + filename + '"')
-    print('Saved capture. Run %s p %s to plot.' % argv[0], capturename)
+    print('Saved capture. Run %s p %s to plot.' % (argv[0], capturename))
 
 def plot(cap):
     samples = json.load(open(cap + '.json', 'r'))
     w = csv.writer(open(cap + '.csv', 'w'))
-    w.writerow(['time (s)', 'cpu (‰)', 'fan (rpm)', 'P-cluster temp (*10C)'])
+    w.writerow(['time (s)', 'cpu (%)', 'fan (rpm)', 'P-cluster temp (C)'])
     for sample in samples:
         istat = sample['istatistica']
         temps = istat['sensors']
         temps = [temps[k] for k in temps.keys() if k.split(' ')[0] == 'pACC']
         temps = [int(i) for i in temps if i != '' and int(i) != 0]
         row = ['%.1f' % sample['timestamp']]
-        row.append(int(istat['summary_cpuLoad'] * 1000))
+        row.append(int(istat['summary_cpuLoad'] * 100))
         row.append(istat['sensors_fansData'].rstrip())
-        row.append(int(reduce(lambda x, y: x + y, temps) / len(temps) * 10))
+        row.append(int(reduce(lambda x, y: x + y, temps) / len(temps)))
         w.writerow(row)
     system('open \'%s.csv\'' % cap)
 
