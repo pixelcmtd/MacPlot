@@ -18,7 +18,6 @@ def strip_empty(l):
 def capture(capturename):
     filename = capturename + '.json'
     samples = []
-    print('Capturing...')
     starttime = datetime.now()
     try:
         while True:
@@ -29,34 +28,34 @@ def capture(capturename):
             sleep(1)
     except:
         pass
-    print('Saving to file...')
     f = open(filename, 'w')
     json.dump(samples, f)
-    system('chown "$(logname)" "' + filename + '"')
-    print('Saved capture. Run %s p %s to plot.' % (argv[0], capturename))
+    return samples
 
-def plot(cap):
-    samples = json.load(open(cap + '.json', 'r'))
+def plot(samples):
     w = csv.writer(open(cap + '.csv', 'w'))
-    w.writerow(['time (s)', 'cpu (%)', 'fan (rpm)', 'P-cluster temp (C)'])
+    w.writerow(['time (s)', 'cpu (%)', 'fan (rpm)', 'P-cluster (℃)', 'battery (%)', 'disk read (MB/s)', 'disk write (MB/s)', 'net down (KB/s)', 'net up (KB/s)', 'mem free (MB)', 'mem inactive (MB)', 'mem used (MB)', 'mem wired (MB)', 'mem other (MB)'])
     for sample in samples:
         istat = sample['istatistica']
         temps = istat['sensors']
         temps = [temps[k] for k in temps.keys() if k.split(' ')[0] == 'pACC']
         temps = [int(i) for i in temps if i != '' and int(i) != 0]
-        row = ['%.1f' % sample['timestamp']]
+        row = [int(sample['timestamp'])]
         row.append(int(istat['summary_cpuLoad'] * 100))
         row.append(istat['sensors_fansData'].rstrip())
         row.append(int(reduce(lambda x, y: x + y, temps) / len(temps)))
+        row.append(istat['battery_charge'])
+        row.append(int(istat['diskIO_speedRead'] / 1000000))
+        row.append(int(istat['diskIO_speedWrite'] / 1000000))
+        row.append(int(istat['network_speedDownload'] / 1000))
+        row.append(int(istat['network_speedUpload'] / 1000))
+        row.append(int(istat['summary_memoryFree'] / 1000000))
+        row.append(int(istat['summary_memoryInactive'] / 1000000))
+        row.append(int(istat['summary_memoryUsed'] / 1000000))
+        row.append(int(istat['summary_memoryWired'] / 1000000))
+        row.append(int(istat['summary_memoryOther'] / 1000000))
         w.writerow(row)
     system('open \'%s.csv\'' % cap)
 
-if argv[1][0] == 'c':
-    capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
-elif argv[1][0] == 'p':
-    plot(argv[2])
-else:
-    print('MacPlot by chrissx <chrissx@chrissx.de>')
-    print('Usage:')
-    print('%s c[capture]: capture data' % argv[0])
-    print('%s p[plot] [cap]: prepare the data and open numbers for plotting' % argv[0])
+if __name__ == '__main__':
+    plot(capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S')))
