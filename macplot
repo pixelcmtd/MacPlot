@@ -32,8 +32,8 @@ def capture(capturename):
     json.dump(samples, f)
     return samples
 
-def plot(samples):
-    w = csv.writer(open(cap + '.csv', 'w'))
+def plot(samples, capturename):
+    w = csv.writer(open(capturename + '.csv', 'w'))
     w.writerow(['time (s)', 'cpu (%)', 'fan (rpm)', 'P-cluster (℃)', 'battery (%)', 'disk read (MB/s)', 'disk write (MB/s)', 'net down (KB/s)', 'net up (KB/s)', 'mem free (MB)', 'mem inactive (MB)', 'mem used (MB)', 'mem wired (MB)', 'mem other (MB)'])
     for sample in samples:
         istat = sample['istatistica']
@@ -58,4 +58,16 @@ def plot(samples):
     system('open \'%s.csv\'' % cap)
 
 if __name__ == '__main__':
-    plot(capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S')))
+    if len(argv) == 1:
+        cap = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        plot(capture(cap), cap)
+    elif argv[1][0] == 'c':
+        capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    elif argv[1][0] == 'p':
+        plot(json.load(open(argv[2] + '.json', 'r')))
+    else:
+        print('MacPlot by chrissx <chrissx@chrissx.de>')
+        print('Usage:')
+        print('%s: capture and plot in one command')
+        print('%s c[capture]: capture data' % argv[0])
+        print('%s p[plot] [cap]: prepare the data and open numbers for plotting' % argv[0])
