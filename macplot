@@ -64,7 +64,7 @@ if __name__ == '__main__':
     elif argv[1][0] == 'c':
         capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
     elif argv[1][0] == 'p':
-        plot(json.load(open(argv[2] + '.json', 'r')))
+        plot(json.load(open(argv[2] + '.json', 'r')), argv[2])
     else:
         print('MacPlot by chrissx <chrissx@chrissx.de>')
         print('Usage:')
