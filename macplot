@@ -55,7 +55,7 @@ def plot(samples, capturename):
         row.append(int(istat['summary_memoryWired'] / 1000000))
         row.append(int(istat['summary_memoryOther'] / 1000000))
         w.writerow(row)
-    system('open \'%s.csv\'' % cap)
+    system('open \'%s.csv\'' % capturename)
 
 if __name__ == '__main__':
     if len(argv) == 1:
