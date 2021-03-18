@@ -34,13 +34,17 @@ def capture(capturename):
 
 def plot(samples, capturename):
     w = csv.writer(open(capturename + '.csv', 'w'))
-    w.writerow(['time (s)', 'cpu (%)', 'fan (rpm)', 'P-cluster (℃)', 'battery (%)', 'disk read (MB/s)', 'disk write (MB/s)', 'net down (KB/s)', 'net up (KB/s)', 'mem free (MB)', 'mem inactive (MB)', 'mem used (MB)', 'mem wired (MB)', 'mem other (MB)'])
+    w.writerow(['time', 'cpu (%)', 'fan (rpm)', 'P-cluster (℃)', 'battery (%)', 'disk read (MB/s)', 'disk write (MB/s)', 'net down (KB/s)', 'net up (KB/s)', 'mem free (MB)', 'mem inactive (MB)', 'mem used (MB)', 'mem wired (MB)', 'mem other (MB)'])
     for sample in samples:
         istat = sample['istatistica']
         temps = istat['sensors']
         temps = [temps[k] for k in temps.keys() if k.split(' ')[0] == 'pACC']
         temps = [int(i) for i in temps if i != '' and int(i) != 0]
-        row = [int(sample['timestamp'])]
+        ts = int(sample['timestamp'])
+        if len(samples) < 100:
+            row = ['%02d' % ts]
+        else:
+            row = ['%d:%02d' % (int(ts / 60), ts % 60)]
         row.append(int(istat['summary_cpuLoad'] * 100))
         row.append(istat['sensors_fansData'].rstrip())
         row.append(int(reduce(lambda x, y: x + y, temps) / len(temps)))
