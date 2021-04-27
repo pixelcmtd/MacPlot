@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
-import json
-import csv
-import subprocess
-import re
-import requests
+
 from datetime import datetime, timedelta
 from functools import reduce
 from sys import argv
+from subprocess import run as rawrun
 from time import sleep
+import json
+import csv
+import requests
 
 def system(cmd):
-    return subprocess.run(['/bin/sh', '-c', cmd], capture_output=True).stdout
-
-def strip_empty(l):
-    return [i for i in l if len(i) > 0]
+    return rawrun(['/bin/sh', '-c', cmd], capture_output=True).stdout
 
 def capture(capturename):
     filename = capturename + '.json'
@@ -26,7 +23,7 @@ def capture(capturename):
             samples.append({'timestamp': timestamp / timedelta(seconds=1),
                             'istatistica': json.loads(istat.text)})
             sleep(1)
-    except:
+    except KeyboardInterrupt:
         pass
     f = open(filename, 'w')
     json.dump(samples, f)
@@ -34,7 +31,22 @@ def capture(capturename):
 
 def plot(samples, capturename):
     w = csv.writer(open(capturename + '.csv', 'w'))
-    w.writerow(['time', 'cpu (%)', 'fan (rpm)', 'P-cluster (℃)', 'battery (%)', 'disk read (MB/s)', 'disk write (MB/s)', 'net down (KB/s)', 'net up (KB/s)', 'mem free (MB)', 'mem inactive (MB)', 'mem used (MB)', 'mem wired (MB)', 'mem other (MB)'])
+    w.writerow([
+        'time',
+        'cpu (%)',
+        'fan (rpm)',
+        'P-cluster (℃)',
+        'battery (%)',
+        'disk read (MB/s)',
+        'disk write (MB/s)',
+        'net down (KB/s)',
+        'net up (KB/s)',
+        'mem free (MB)',
+        'mem inactive (MB)',
+        'mem used (MB)',
+        'mem wired (MB)',
+        'mem other (MB)'
+    ])
     for sample in samples:
         istat = sample['istatistica']
         temps = istat['sensors']
@@ -43,8 +55,10 @@ def plot(samples, capturename):
         ts = int(sample['timestamp'])
         if len(samples) < 100:
             row = ['%02d' % ts]
+        elif len(samples) < 6000:
+            row = ['%d:%02d' % (int(ts/60), ts%60)]
         else:
-            row = ['%d:%02d' % (int(ts / 60), ts % 60)]
+            row = ['%d:%02d:%02d' % (int(ts/3600), int(ts%3600/60), ts%60)]
         row.append(int(istat['summary_cpuLoad'] * 100))
         row.append(istat['sensors_fansData'].rstrip())
         row.append(int(reduce(lambda x, y: x + y, temps) / len(temps)))
@@ -72,6 +86,6 @@ if __name__ == '__main__':
     else:
         print('MacPlot by chrissx <chrissx@chrissx.de>')
         print('Usage:')
-        print('%s: capture and plot in one command')
+        print('%s: capture and plot in one command' % argv[0])
         print('%s c[capture]: capture data' % argv[0])
         print('%s p[plot] [cap]: prepare the data and open numbers for plotting' % argv[0])
