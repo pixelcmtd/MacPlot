@@ -1,3 +1,0 @@
-install root {
-        !cp -f macplot /usr/local/bin/macplot
-}

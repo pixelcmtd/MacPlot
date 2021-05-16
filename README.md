@@ -19,5 +19,3 @@ information, so you will need it: https://www.imagetasks.com/istatistica/pro/
 Make sure you have the PIP3 package `requests` and the Numbers app installed.
 
 Just clone and cd, then run `./macplot` and press ctrl-c when you're done.
-
-If you want to install it, you can also run `sm install`.
