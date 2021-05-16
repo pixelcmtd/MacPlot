@@ -13,7 +13,7 @@ Or just implement it by yourself and make a PR.
 
 ## How to
 
-At the moment we're using iStatista's API for getting all of the required
+At the moment we're using iStatistica's API for getting all of the required
 information, so you will need it: https://www.imagetasks.com/istatistica/pro/
 
 Make sure you have the PIP3 package `requests` and the Numbers app installed.
