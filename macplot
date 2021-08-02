@@ -3,14 +3,17 @@
 from datetime import datetime, timedelta
 from functools import reduce
 from sys import argv
-from subprocess import run as rawrun
+from subprocess import run as rawrun, Popen, PIPE
 from time import sleep
 import json
 import csv
 import requests
 
+def bg(cmd):
+    return Popen(cmd, shell=True, stdout=PIPE)
+
 def system(cmd):
-    return rawrun(['/bin/sh', '-c', cmd], capture_output=True).stdout
+    return rawrun(cmd, capture_output=True, check=True, shell=True).stdout
 
 def capture(capturename):
     filename = capturename + '.json'
@@ -18,37 +21,47 @@ def capture(capturename):
     starttime = datetime.now()
     try:
         while True:
+            pm = bg('powermetrics -i 1000 -n 1')
+            sleep(1)
             istat = requests.get('http://localhost:4027/api/')
+            pm.wait()
+            pm = pm.stdout.readlines()
+            pm = [s for b in pm if (s := b.decode('utf-8').rstrip()) != '' and ':' in s]
+            pm = dict([[f.strip() for f in s.split(':', 1)] for s in pm])
             timestamp = datetime.now() - starttime
             samples.append({'timestamp': timestamp / timedelta(seconds=1),
-                            'istatistica': json.loads(istat.text)})
-            sleep(1)
+                            'istatistica': json.loads(istat.text),
+                            'powermetrics': pm})
     except KeyboardInterrupt:
         pass
-    f = open(filename, 'w')
-    json.dump(samples, f)
+    json.dump(samples, open(filename, 'w'))
     return samples
 
-def plot(samples, capturename):
+def plot(samples, capturename: str):
     w = csv.writer(open(capturename + '.csv', 'w'))
     w.writerow([
         'time',
         'cpu (%)',
         'fan (rpm)',
-        'P-cluster (℃)',
+        'p-cluster (℃)',
         'battery (%)',
-        'disk read (MB/s)',
-        'disk write (MB/s)',
-        'net down (KB/s)',
-        'net up (KB/s)',
-        'mem free (MB)',
-        'mem inactive (MB)',
-        'mem used (MB)',
-        'mem wired (MB)',
-        'mem other (MB)'
-    ])
+        'read (MB/s)',
+        'write (MB/s)',
+        'recv (KB/s)',
+        'send (KB/s)',
+        'free (MB)',
+        'inactive (MB)',
+        'used (MB)',
+        'wired (MB)',
+        'other (MB)',
+        'cpu (mW)',
+        'gpu (mW)',
+        'e-cluster (mW)',
+        'p-cluster (mW)',
+    ] + [f'cpu{i} (MHz)' for i in range(8)])
     for sample in samples:
         istat = sample['istatistica']
+        pm = sample['powermetrics']
         temps = istat['sensors']
         temps = [temps[k] for k in temps.keys() if k.split(' ')[0] == 'pACC']
         temps = [int(i) for i in temps if i != '' and int(i) != 0]
@@ -72,6 +85,11 @@ def plot(samples, capturename):
         row.append(int(istat['summary_memoryUsed'] / 1000000))
         row.append(int(istat['summary_memoryWired'] / 1000000))
         row.append(int(istat['summary_memoryOther'] / 1000000))
+        row.append(pm['CPU Power'].split(' ')[0])
+        row.append(pm['GPU Power'].split(' ')[0])
+        row.append(pm['E-Cluster Power'].split(' ')[0])
+        row.append(pm['P-Cluster Power'].split(' ')[0])
+        row.extend([pm[f'CPU {i} frequency'].split(' ')[0] for i in range(8)])
         w.writerow(row)
     system('open \'%s.csv\'' % capturename)
 
