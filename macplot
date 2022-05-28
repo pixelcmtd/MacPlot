@@ -58,6 +58,7 @@ def plot(samples, capturename: str):
         'gpu (mW)',
         'e-cluster (mW)',
         'p-cluster (mW)',
+        # we currently only support machines with 8 cpus, TODO: fix that
     ] + [f'cpu{i} (MHz)' for i in range(8)])
     for sample in samples:
         istat = sample['istatistica']
