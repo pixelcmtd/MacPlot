@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 
+import csv
+import json
 from datetime import datetime, timedelta
 from functools import reduce
+from subprocess import PIPE, Popen
+from subprocess import run as rawrun
 from sys import argv
-from subprocess import run as rawrun, Popen, PIPE
 from time import sleep
-import json
-import csv
+
 import requests
+
+# we currently only support machines with 10 cpus, TODO: fix that
+NCPUS = 10
 
 def bg(cmd):
     return Popen(cmd, shell=True, stdout=PIPE)
@@ -57,15 +62,13 @@ def plot(samples, capturename: str):
         'cpu (mW)',
         'gpu (mW)',
         'e-cluster (mW)',
-        'p-cluster (mW)',
-        # we currently only support machines with 8 cpus, TODO: fix that
-    ] + [f'cpu{i} (MHz)' for i in range(8)])
+        'p0-cluster (mW)',
+        'p1-cluster (mW)',
+    ] + [f'cpu{i} (MHz)' for i in range(NCPUS)])
     for sample in samples:
         istat = sample['istatistica']
         pm = sample['powermetrics']
-        temps = istat['sensors']
-        temps = [temps[k] for k in temps.keys() if k.split(' ')[0] == 'pACC']
-        temps = [int(i) for i in temps if i != '' and int(i) != 0]
+        temps = [int(i) for i in istat['sensors'].values() if i != '' and int(i) != 0]
         ts = int(sample['timestamp'])
         if len(samples) < 100:
             row = ['%02d' % ts]
@@ -89,8 +92,9 @@ def plot(samples, capturename: str):
         row.append(pm['CPU Power'].split(' ')[0])
         row.append(pm['GPU Power'].split(' ')[0])
         row.append(pm['E-Cluster Power'].split(' ')[0])
-        row.append(pm['P-Cluster Power'].split(' ')[0])
-        row.extend([pm[f'CPU {i} frequency'].split(' ')[0] for i in range(8)])
+        row.append(pm['P0-Cluster Power'].split(' ')[0])
+        row.append(pm['P1-Cluster Power'].split(' ')[0])
+        row.extend([pm[f'CPU {i} frequency'].split(' ')[0] for i in range(NCPUS)])
         w.writerow(row)
     system('open \'%s.csv\'' % capturename)
 
