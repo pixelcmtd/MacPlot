@@ -2,23 +2,24 @@
 
 import csv
 import json
+from collections import OrderedDict
 from datetime import datetime, timedelta
-from functools import reduce
-from subprocess import PIPE, Popen
-from subprocess import run as rawrun
+from subprocess import PIPE, Popen, run
 from sys import argv
-from time import sleep
+from time import localtime, sleep, strftime
 
 import requests
 
-# we currently only support machines with 10 cpus, TODO: fix that
-NCPUS = 10
 
 def bg(cmd):
     return Popen(cmd, shell=True, stdout=PIPE)
 
-def system(cmd):
-    return rawrun(cmd, capture_output=True, check=True, shell=True).stdout
+def json2csv(j: list, w: csv.writer):
+    if len(j) == 0:
+        return
+    w.writerow(j[0].keys())
+    for r in j:
+        w.writerow(r.values())
 
 def capture(capturename):
     filename = capturename + '.json'
@@ -27,11 +28,10 @@ def capture(capturename):
     try:
         while True:
             pm = bg('powermetrics -i 1000 -n 1')
-            sleep(1)
+            sleep(0.95)
             istat = requests.get('http://localhost:4027/api/')
             pm.wait()
-            pm = pm.stdout.readlines()
-            pm = [s for b in pm if (s := b.decode('utf-8').rstrip()) != '' and ':' in s]
+            pm = [s for b in pm.stdout.readlines() if ':' in (s := b.decode('utf-8').rstrip())]
             pm = dict([[f.strip() for f in s.split(':', 1)] for s in pm])
             timestamp = datetime.now() - starttime
             samples.append({'timestamp': timestamp / timedelta(seconds=1),
@@ -39,64 +39,34 @@ def capture(capturename):
                             'powermetrics': pm})
     except KeyboardInterrupt:
         pass
-    json.dump(samples, open(filename, 'w'))
+    json.dump(samples, open(filename, 'w', encoding='utf-8'))
     return samples
 
 def plot(samples, capturename: str):
-    w = csv.writer(open(capturename + '.csv', 'w'))
-    w.writerow([
-        'time',
-        'cpu (%)',
-        'fan (rpm)',
-        'p-cluster (℃)',
-        'battery (%)',
-        'read (MB/s)',
-        'write (MB/s)',
-        'recv (KB/s)',
-        'send (KB/s)',
-        'free (MB)',
-        'inactive (MB)',
-        'used (MB)',
-        'wired (MB)',
-        'other (MB)',
-        'cpu (mW)',
-        'gpu (mW)',
-        'e-cluster (mW)',
-        'p0-cluster (mW)',
-        'p1-cluster (mW)',
-    ] + [f'cpu{i} (MHz)' for i in range(NCPUS)])
+    j = []
+    fmt = '%S' if (l := samples[-1:][0]['timestamp']) < 60 else '%M:%S' if l < 3600 else '%H:%M:%S'
     for sample in samples:
+        row = OrderedDict()
         istat = sample['istatistica']
+        row['Time'] = strftime(fmt, localtime(sample['timestamp']))
+        row['CPU (%)'] = int(istat['summary_cpuLoad'] * 100)
+        row.update([(f'{k} (rpm)', v) for k,v in istat['fans'].items()])
+        row.update([(f'{k} (℃)', v) for k,v in istat['sensors'].items()])
+        row['Battery (%)'] = istat['battery_charge']
+        row['Read (MB/s)'] = int(istat['diskIO_speedRead'] / 1000000)
+        row['Write (MB/s)'] = int(istat['diskIO_speedWrite'] / 1000000)
+        row['Recv (KB/s)'] = int(istat['network_speedDownload'] / 1000)
+        row['Send (KB/s)'] = int(istat['network_speedUpload'] / 1000)
+        row.update([(f'{x} (MB)', int(istat[f'summary_memory{x}'] / 1000000)) for x in ('Free', 'Inactive', 'Used', 'Wired', 'Other')])
         pm = sample['powermetrics']
-        temps = [int(i) for i in istat['sensors'].values() if i != '' and int(i) != 0]
-        ts = int(sample['timestamp'])
-        if len(samples) < 100:
-            row = ['%02d' % ts]
-        elif len(samples) < 6000:
-            row = ['%d:%02d' % (int(ts/60), ts%60)]
-        else:
-            row = ['%d:%02d:%02d' % (int(ts/3600), int(ts%3600/60), ts%60)]
-        row.append(int(istat['summary_cpuLoad'] * 100))
-        row.append(istat['sensors_fansData'].rstrip())
-        row.append(int(reduce(lambda x, y: x + y, temps) / len(temps)))
-        row.append(istat['battery_charge'])
-        row.append(int(istat['diskIO_speedRead'] / 1000000))
-        row.append(int(istat['diskIO_speedWrite'] / 1000000))
-        row.append(int(istat['network_speedDownload'] / 1000))
-        row.append(int(istat['network_speedUpload'] / 1000))
-        row.append(int(istat['summary_memoryFree'] / 1000000))
-        row.append(int(istat['summary_memoryInactive'] / 1000000))
-        row.append(int(istat['summary_memoryUsed'] / 1000000))
-        row.append(int(istat['summary_memoryWired'] / 1000000))
-        row.append(int(istat['summary_memoryOther'] / 1000000))
-        row.append(pm['CPU Power'].split(' ')[0])
-        row.append(pm['GPU Power'].split(' ')[0])
-        row.append(pm['E-Cluster Power'].split(' ')[0])
-        row.append(pm['P0-Cluster Power'].split(' ')[0])
-        row.append(pm['P1-Cluster Power'].split(' ')[0])
-        row.extend([pm[f'CPU {i} frequency'].split(' ')[0] for i in range(NCPUS)])
-        w.writerow(row)
-    system('open \'%s.csv\'' % capturename)
+        power = [(k.replace(' Power', ''), v.split(' ')) for k,v in pm.items() if ' Power' in k]
+        row.update([(f'{n} ({v[1]})', v[0]) for n,v in power])
+        cpus = [(k.replace(' frequency', ''), v.split(' ')) for k,v in pm.items() if ' frequency' in k]
+        row.update([(f'{i} ({v[1]})', v[0]) for i,v in cpus])
+        j.append(row)
+    with open(capturename + '.csv', 'w', encoding='utf-8') as f:
+        json2csv(j, csv.writer(f))
+    run(f'open \'{capturename}.csv\'', check=True, shell=True)
 
 if __name__ == '__main__':
     if len(argv) == 1:
@@ -105,10 +75,11 @@ if __name__ == '__main__':
     elif argv[1][0] == 'c':
         capture(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
     elif argv[1][0] == 'p':
-        plot(json.load(open(argv[2] + '.json', 'r')), argv[2])
+        with open(argv[2] + '.json', 'r', encoding='utf-8') as f:
+            plot(json.load(f), argv[2])
     else:
-        print('MacPlot by chrissx <chrissx@chrissx.de>')
+        print('MacPlot by pixel <pixel@chrissx.de>')
         print('Usage:')
-        print('%s: capture and plot in one command' % argv[0])
-        print('%s c[capture]: capture data' % argv[0])
-        print('%s p[plot] [cap]: prepare the data and open numbers for plotting' % argv[0])
+        print(f'  {argv[0]}: capture and plot in one command')
+        print(f'  {argv[0]} c[apture]: capture data')
+        print(f'  {argv[0]} p[lot] [cap]: prepare the data and open numbers for plotting')
