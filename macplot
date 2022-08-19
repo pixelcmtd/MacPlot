@@ -7,9 +7,13 @@ from datetime import datetime, timedelta
 from subprocess import PIPE, Popen, run
 from sys import argv
 from time import localtime, sleep, strftime
+from os import nice
+from itertools import chain
 
 import requests
 
+def log(msg):
+    print(f'[{datetime.now()}] {str(msg)}')
 
 def bg(cmd):
     return Popen(cmd, shell=True, stdout=PIPE)
@@ -21,7 +25,10 @@ def json2csv(j: list, w: csv.writer):
     for r in j:
         w.writerow(r.values())
 
-def capture(capturename):
+def capture(capturename: str):
+    log('niceness: ' + str(nice(-20)))
+    run('renice -n -20 -p `pgrep "iStatistica Pro"` `pgrep "iStatistica Sensors"`', shell=True)
+    log('also reniced istat')
     filename = capturename + '.json'
     samples = []
     starttime = datetime.now()
