@@ -2,6 +2,7 @@
 
 import csv
 import json
+import plistlib as plist
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from subprocess import PIPE, Popen, run
@@ -34,22 +35,25 @@ def capture(capturename: str):
     starttime = datetime.now()
     try:
         while True:
-            pm = bg('powermetrics -i 1000 -n 1')
-            sleep(0.95)
+            pm = bg('powermetrics -i 1000 -n 1 -f plist')
+            sleep(0.5)
+            log('getting istat')
             istat = requests.get('http://localhost:4027/api/')
-            pm.wait()
-            pm = [s for b in pm.stdout.readlines() if ':' in (s := b.decode('utf-8').rstrip())]
-            pm = dict([[f.strip() for f in s.split(':', 1)] for s in pm])
+            log('got istat, waiting for pm')
+            pm = pm.stdout.read()
             timestamp = datetime.now() - starttime
+            pm = plist.loads(pm)
+            pm['timestamp'] = pm['timestamp'].isoformat()
             samples.append({'timestamp': timestamp / timedelta(seconds=1),
                             'istatistica': json.loads(istat.text),
                             'powermetrics': pm})
+            log('done the sample')
     except KeyboardInterrupt:
         pass
     json.dump(samples, open(filename, 'w', encoding='utf-8'))
     return samples
 
-def plot(samples, capturename: str):
+def plot(samples: list, capturename: str):
     j = []
     fmt = '%S' if (l := samples[-1:][0]['timestamp']) < 60 else '%M:%S' if l < 3600 else '%H:%M:%S'
     for sample in samples:
@@ -66,10 +70,10 @@ def plot(samples, capturename: str):
         row['Send (KB/s)'] = int(istat['network_speedUpload'] / 1000)
         row.update([(f'{x} (MB)', int(istat[f'summary_memory{x}'] / 1000000)) for x in ('Free', 'Inactive', 'Used', 'Wired', 'Other')])
         pm = sample['powermetrics']
-        power = [(k.replace(' Power', ''), v.split(' ')) for k,v in pm.items() if ' Power' in k]
-        row.update([(f'{n} ({v[1]})', v[0]) for n,v in power])
-        cpus = [(k.replace(' frequency', ''), v.split(' ')) for k,v in pm.items() if ' frequency' in k]
-        row.update([(f'{i} ({v[1]})', v[0]) for i,v in cpus])
+        row.update([(k.replace('_power', ' (mW)'), v) for k,v in pm['processor'].items() if '_power' in k])
+        row.update([(f'{c["name"]} (mW)', c['power']) for c in pm['processor']['clusters']])
+        row.update([(f'{c["name"]} (Hz)', c['freq_hz']) for c in pm['processor']['clusters']])
+        row.update([(f'CPU {c["cpu"]} (Hz)', c['freq_hz']) for c in chain(*[c['cpus'] for c in pm['processor']['clusters']])])
         j.append(row)
     with open(capturename + '.csv', 'w', encoding='utf-8') as f:
         json2csv(j, csv.writer(f))
