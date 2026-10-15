@@ -10,6 +10,7 @@ from sys import argv
 from time import localtime, sleep, strftime
 from os import nice
 from itertools import chain
+from xml.parsers.expat import ExpatError
 
 import requests
 
@@ -17,7 +18,7 @@ def log(msg):
     print(f'[{datetime.now()}] {str(msg)}')
 
 def bg(cmd):
-    return Popen(cmd, shell=True, stdout=PIPE)
+    return Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
 
 def json2csv(j: list, w: csv.writer):
     if len(j) == 0:
@@ -40,9 +41,18 @@ def capture(capturename: str):
             log('getting istat')
             istat = requests.get('http://localhost:4027/api/')
             log('got istat, waiting for pm')
-            pm = pm.stdout.read()
+            output, stderr = pm.communicate()
+            if pm.returncode:
+                log(f'powermetrics failed: {stderr.decode(errors="replace").strip()}')
+                continue
             timestamp = datetime.now() - starttime
-            pm = plist.loads(pm)
+            try:
+                pm = plist.loads(output.strip(b'\0'))
+            except (ExpatError, plist.InvalidFileException) as e:
+                with open(f'{capturename}-invalid-{datetime.now():%H-%M-%S-%f}.plist', 'wb') as f:
+                    f.write(output)
+                log(f'invalid powermetrics plist: {e}; saved to {f.name}, skipping sample')
+                continue
             pm['timestamp'] = pm['timestamp'].isoformat()
             samples.append({'timestamp': timestamp / timedelta(seconds=1),
                             'istatistica': json.loads(istat.text),
@@ -50,7 +60,9 @@ def capture(capturename: str):
             log('done the sample')
     except KeyboardInterrupt:
         pass
-    json.dump(samples, open(filename, 'w', encoding='utf-8'))
+    finally:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(samples, f)
     return samples
 
 def plot(samples: list, capturename: str):
