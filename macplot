@@ -66,9 +66,6 @@ def capture(capturename: str):
     return samples
 
 def plot(samples: list, capturename: str):
-    if not samples:
-        log('no samples to plot')
-        return
     j = []
     fmt = '%S' if (l := samples[-1:][0]['timestamp']) < 60 else '%M:%S' if l < 3600 else '%H:%M:%S'
     for sample in samples:
